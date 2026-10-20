@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>WOW! STORY 課堂觸控互動字母轉盤</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Canvas Confetti Library -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Noto+Sans+TC:wght@500;700;900&display=swap');
+    
+    * {
+      touch-action: manipulation;
+    }
+
+    body {
+      font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #f8fafc;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow-x: hidden;
+    }
+
+    .glass-panel {
+      background: rgba(30, 41, 59, 0.85);
+      backdrop-filter: blur(16px);
+      border: 2px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 20px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .touch-btn {
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+    .touch-btn:active {
+      transform: scale(0.93) !important;
+    }
+
+    /* Giant Touch Cards for Touchscreen PK */
+    .giant-card {
+      min-height: 80px;
+      border-radius: 1.5rem;
+      border: 3px solid transparent;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    }
+    .giant-card.selected {
+      border-color: #38bdf8;
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.6);
+      transform: scale(1.03);
+    }
+
+    /* Page Views Toggle */
+    .page-view {
+      display: none;
+    }
+    .page-view.active {
+      display: flex;
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col justify-between p-2 sm:p-4">
+
+  <!-- Top Classroom Bar (Header & Team Scoreboard) -->
+  <header class="w-full max-w-7xl mx-auto glass-panel rounded-3xl p-3 sm:p-4 mb-3 flex flex-wrap items-center justify-between gap-3">
+    
+    <!-- Title & Brand Logo -->
+    <div class="flex items-center gap-3">
+      <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-slate-900 font-black text-2xl shadow-lg border-2 border-amber-300">
+        W!
+      </div>
+      <div>
+        <h1 class="text-xl sm:text-2xl font-black text-amber-400 tracking-wide flex items-center gap-2">
+          WOW! STORY <span class="text-xs bg-sky-500 text-white font-bold px-2.5 py-1 rounded-full uppercase">觸控大螢幕教室版</span>
+        </h1>
+        <p class="text-xs text-slate-300 hidden sm:block">何嘉仁 WS 字母與代表字互動教學系統</p>
+      </div>
+    </div>
+
+    <!-- Team Scoreboard for Classroom Battles -->
+    <div class="flex items-center gap-2 sm:gap-4 bg-slate-900/80 p-1.5 px-3 rounded-2xl border border-slate-700">
+      <!-- Red Team -->
+      <div class="flex items-center gap-2 bg-red-950/80 border border-red-500/40 px-3 py-1 rounded-xl">
+        <span class="text-xs font-bold text-red-400">紅隊</span>
+        <span id="scoreRed" class="text-xl font-black text-red-300">0</span>
+        <div class="flex gap-1 ml-1">
+          <button onclick="changeScore('red', 10)" class="touch-btn text-xs bg-red-600 hover:bg-red-500 text-white font-bold px-2 py-1 rounded-md">+10</button>
+          <button onclick="changeScore('red', -10)" class="touch-btn text-xs bg-red-900 hover:bg-red-800 text-red-200 font-bold px-1.5 py-1 rounded-md">-10</button>
+        </div>
+      </div>
+
+      <!-- Blue Team -->
+      <div class="flex items-center gap-2 bg-blue-950/80 border border-blue-500/40 px-3 py-1 rounded-xl">
+        <span class="text-xs font-bold text-blue-400">藍隊</span>
+        <span id="scoreBlue" class="text-xl font-black text-blue-300">0</span>
+        <div class="flex gap-1 ml-1">
+          <button onclick="changeScore('blue', 10)" class="touch-btn text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold px-2 py-1 rounded-md">+10</button>
+          <button onclick="changeScore('blue', -10)" class="touch-btn text-xs bg-blue-900 hover:bg-blue-800 text-blue-200 font-bold px-1.5 py-1 rounded-md">-10</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Tools -->
+    <div class="flex items-center gap-2">
+      <button id="soundToggleBtn" onclick="toggleSound()" class="w-10 h-10 rounded-2xl bg-slate-800 hover:bg-slate-700 text-sky-400 flex items-center justify-center border border-slate-600" title="聲音切換">
+        <i id="soundIcon" class="fa-solid fa-volume-high text-lg"></i>
+      </button>
+      <button onclick="openGalleryModal()" class="px-3 py-2 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-lg border border-sky-400">
+        <i class="fa-solid fa-book-open"></i>
+        <span>A-Z 圖鑑</span>
+      </button>
+    </div>
+
+  </header>
+
+  <!-- Navigation Tabs Bar -->
+  <nav class="max-w-7xl w-full mx-auto mb-3 grid grid-cols-3 gap-2 bg-slate-900/80 p-2 rounded-2xl border border-slate-800 font-black text-xs sm:text-base text-center">
+    <button id="tabBtnWheel" onclick="switchPage('wheelPage')" class="nav-tab-btn py-3 px-2 rounded-xl transition bg-amber-500 text-slate-950 shadow-xl flex items-center justify-center gap-2">
+      <i class="fa-solid fa-rotate text-lg"></i>
+      <span>🎡 1. 三圈轉盤 & 任務</span>
+    </button>
+    <button id="tabBtnTracing" onclick="switchPage('tracingPage')" class="nav-tab-btn py-3 px-2 rounded-xl transition text-slate-300 hover:bg-slate-800 flex items-center justify-center gap-2">
+      <i class="fa-solid fa-pen-nib text-emerald-400 text-lg"></i>
+      <span>✍️ 2. 轉盤手寫 PK 板</span>
+    </button>
+    <button id="tabBtnMatch" onclick="switchPage('matchPage')" class="nav-tab-btn py-3 px-2 rounded-xl transition text-slate-300 hover:bg-slate-800 flex items-center justify-center gap-2">
+      <i class="fa-solid fa-hand-pointer text-sky-400 text-lg"></i>
+      <span>🧩 3. 轉盤卡片搶答 PK</span>
+    </button>
+  </nav>
+
+  <!-- Main Multi-Page Container -->
+  <main class="max-w-7xl w-full mx-auto flex-grow flex flex-col gap-4">
+
+    <!-- PAGE 1: 3-Ring Interactive Class Wheel -->
+    <div id="wheelPage" class="page-view active flex-col lg:flex-row gap-4 flex-grow">
+      <!-- Left: Wheel Canvas Area -->
+      <div class="lg:w-1/2 glass-panel rounded-3xl p-4 flex flex-col items-center justify-between relative overflow-hidden min-h-[420px]">
+        <div class="w-full flex items-center justify-between mb-2">
+          <span class="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-compass text-amber-400 animate-spin"></i>
+            擬真三圈旋轉盤
+          </span>
+          <span id="matchBadge" class="text-xs font-black px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+            請旋轉輪盤
+          </span>
+        </div>
+
+        <div class="relative w-full max-w-[360px] aspect-square flex items-center justify-center my-auto">
+          <canvas id="wheelCanvasMain" class="w-full h-full cursor-pointer touch-none drop-shadow-2xl"></canvas>
+        </div>
+
+        <!-- Quick Spin Controls -->
+        <div class="w-full grid grid-cols-4 gap-2 mt-2">
+          <button onclick="spinMainRing('outer')" class="touch-btn py-2.5 px-1 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-500/30 flex flex-col items-center gap-1">
+            <i class="fa-solid fa-rotate-right text-sky-400"></i>
+            <span>轉外圈單字</span>
+          </button>
+          <button onclick="spinMainRing('mid')" class="touch-btn py-2.5 px-1 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 flex flex-col items-center gap-1">
+            <i class="fa-solid fa-rotate-right text-purple-400"></i>
+            <span>轉中圈大寫</span>
+          </button>
+          <button onclick="spinMainRing('inner')" class="touch-btn py-2.5 px-1 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 flex flex-col items-center gap-1">
+            <i class="fa-solid fa-rotate-right text-amber-400"></i>
+            <span>轉內圈小寫</span>
+          </button>
+          <button onclick="spinAllMainRings()" class="touch-btn py-2.5 px-1 text-xs font-bold rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg flex flex-col items-center gap-1">
+            <i class="fa-solid fa-arrows-spin text-white"></i>
+            <span>一鍵全轉!</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right: Alignment Results & Class Activity Wheel Box -->
+      <div class="lg:w-1/2 flex flex-col gap-4">
+        <!-- Wheel Result Display Area -->
+        <div class="glass-panel rounded-3xl p-5 border-2 border-amber-500/40">
+          <h2 class="text-sm font-black text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-eye text-lg"></i>
+            當前對齊結果 (放大顯示與語音發音)
+          </h2>
+          
+          <div class="grid grid-cols-3 gap-2 text-center mb-3">
+            <!-- Outer Ring Result -->
+            <div class="bg-slate-900/90 p-3 rounded-2xl border border-sky-500/40 flex flex-col items-center justify-center">
+              <div class="text-xs font-bold text-sky-400 mb-1">外圈 (代表字)</div>
+              <div id="resOuterIcon" class="text-3xl mb-1">🍎</div>
+              <div id="resOuterWord" class="text-lg font-black text-white">apple</div>
+              <button onclick="speakResult('outer')" class="mt-2 touch-btn px-3 py-1 bg-sky-600 text-white rounded-xl text-xs font-bold flex items-center gap-1">
+                <i class="fa-solid fa-volume-high"></i> 讀單字
+              </button>
+            </div>
+
+            <!-- Mid Ring Result -->
+            <div class="bg-slate-900/90 p-3 rounded-2xl border border-purple-500/40 flex flex-col items-center justify-center">
+              <div class="text-xs font-bold text-purple-400 mb-1">中圈 (大寫)</div>
+              <div id="resMidLetter" class="text-4xl font-black text-purple-200 my-1">A</div>
+              <button onclick="speakResult('mid')" class="mt-2 touch-btn px-3 py-1 bg-purple-600 text-white rounded-xl text-xs font-bold flex items-center gap-1">
+                <i class="fa-solid fa-volume-high"></i> 讀大寫
+              </button>
+            </div>
+
+            <!-- Inner Ring Result -->
+            <div class="bg-slate-900/90 p-3 rounded-2xl border border-amber-500/40 flex flex-col items-center justify-center">
+              <div class="text-xs font-bold text-amber-400 mb-1">內圈 (小寫)</div>
+              <div id="resInnerLetter" class="text-4xl font-black text-amber-200 my-1">a</div>
+              <button onclick="speakResult('inner')" class="mt-2 touch-btn px-3 py-1 bg-amber-600 text-white rounded-xl text-xs font-bold flex items-center gap-1">
+                <i class="fa-solid fa-volume-high"></i> 讀小寫
+              </button>
+            </div>
+          </div>
+
+          <button onclick="speakCurrentWordCombo()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white font-black text-sm shadow-lg touch-btn flex items-center justify-center gap-2">
+            <i class="fa-solid fa-volume-high text-lg"></i>
+            朗讀完整組合 (Letter & Word)
+          </button>
+        </div>
+
+        <!-- Class Activity Task Card -->
+        <div class="glass-panel rounded-3xl p-5 flex-grow border-2 border-purple-500/40 flex flex-col justify-between">
+          <div>
+            <div class="text-sm font-black text-purple-400 uppercase tracking-wide mb-2 flex items-center gap-2">
+              <i class="fa-solid fa-dice text-xl"></i>
+              課堂動態互動任務卡
+            </div>
+            <p class="text-xs text-slate-300 mb-3">
+              點擊下方按鈕，隨機觸發課堂互動任務指令！
+            </p>
+          </div>
+
+          <div id="activityCard" class="bg-slate-900/80 p-4 rounded-2xl border border-purple-500/30 min-h-[120px] flex flex-col justify-center items-center text-center my-auto">
+            <div class="text-slate-400 text-xs font-bold mb-1">等待抽取任務...</div>
+            <div class="text-base font-black text-purple-300">請按下方的「抽取課堂任務」</div>
+          </div>
+
+          <button onclick="triggerClassroomActivity()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-500 to-pink-600 text-white font-black text-base shadow-xl touch-btn mt-3 flex items-center justify-center gap-2">
+            <i class="fa-solid fa-arrows-spin text-lg"></i>
+            抽取課堂任務 Activity!
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 2: Dual Team Letter Tracing Pad (with dedicated Wheel) -->
+    <div id="tracingPage" class="page-view flex-col lg:flex-row gap-4 flex-grow">
+      
+      <!-- Left Panel: Tracing Target Spinner Wheel -->
+      <div class="lg:w-1/3 glass-panel rounded-3xl p-4 flex flex-col items-center justify-between border-2 border-emerald-500/40 min-h-[380px]">
+        <div class="w-full flex items-center justify-between mb-2">
+          <span class="text-xs font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-compass text-emerald-400"></i>
+            1. 轉盤抽取手寫題目
+          </span>
+          <button onclick="speakCurrentTracingTarget()" class="text-xs bg-slate-800 text-sky-300 font-bold px-2.5 py-1 rounded-lg border border-slate-700">
+            <i class="fa-solid fa-volume-high"></i> 發音
+          </button>
+        </div>
+
+        <!-- Wheel Canvas for Tracing Mode -->
+        <div class="relative w-full max-w-[260px] aspect-square flex items-center justify-center my-auto">
+          <canvas id="wheelCanvasTracing" class="w-full h-full cursor-pointer touch-none drop-shadow-xl"></canvas>
+        </div>
+
+        <!-- Target Display Box -->
+        <div class="w-full bg-slate-900/90 p-3 rounded-2xl border border-emerald-500/40 flex items-center justify-between my-2">
+          <div class="flex items-center gap-3">
+            <div id="tracingTargetIcon" class="text-3xl bg-slate-800 p-2 rounded-xl">🍎</div>
+            <div>
+              <div class="text-xs text-slate-400 font-bold">當前手寫題目：</div>
+              <div id="tracingTargetText" class="text-xl font-black text-emerald-400">Aa (apple)</div>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="spinTracingWheel()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black text-sm shadow-lg touch-btn flex items-center justify-center gap-2">
+          <i class="fa-solid fa-rotate text-lg"></i>
+          旋轉輪盤抽取手寫題目！
+        </button>
+      </div>
+
+      <!-- Right Panel: Dual PK Hand-writing Canvases (Red vs Blue) -->
+      <div class="lg:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow">
+        <!-- Red Team Canvas Area -->
+        <div class="glass-panel rounded-3xl p-4 border-2 border-red-500/50 flex flex-col justify-between">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-black text-red-400 flex items-center gap-2">
+              <i class="fa-solid fa-shield-halved"></i> 紅隊手寫區 (藍色粗線基線與粉紅小屋)
+            </span>
+            <button onclick="clearTracingPad('red')" class="touch-btn text-xs bg-red-950/80 hover:bg-red-900 text-red-300 font-bold px-3 py-1 rounded-xl border border-red-500/40">
+              <i class="fa-solid fa-eraser"></i> 清空紅隊
+            </button>
+          </div>
+
+          <!-- Touch Canvas with 4-Line Grid background -->
+          <div class="relative w-full h-[250px] bg-slate-950 rounded-2xl border border-red-500/30 overflow-hidden touch-none">
+            <canvas id="canvasRed" class="w-full h-full cursor-crosshair relative z-10"></canvas>
+          </div>
+
+          <div class="flex items-center justify-between mt-3">
+            <button onclick="changeScore('red', 10)" class="touch-btn px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-xs shadow-md">
+              👍 書寫優秀 +10 分
+            </button>
+            <span class="text-xs text-slate-400 font-bold">國小四線格規範</span>
+          </div>
+        </div>
+
+        <!-- Blue Team Canvas Area -->
+        <div class="glass-panel rounded-3xl p-4 border-2 border-blue-500/50 flex flex-col justify-between">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-black text-blue-400 flex items-center gap-2">
+              <i class="fa-solid fa-shield-halved"></i> 藍隊手寫區 (藍色粗線基線與粉紅小屋)
+            </span>
+            <button onclick="clearTracingPad('blue')" class="touch-btn text-xs bg-blue-950/80 hover:bg-blue-900 text-blue-300 font-bold px-3 py-1 rounded-xl border border-blue-500/40">
+              <i class="fa-solid fa-eraser"></i> 清空藍隊
+            </button>
+          </div>
+
+          <!-- Touch Canvas with 4-Line Grid background -->
+          <div class="relative w-full h-[250px] bg-slate-950 rounded-2xl border border-blue-500/30 overflow-hidden touch-none">
+            <canvas id="canvasBlue" class="w-full h-full cursor-crosshair relative z-10"></canvas>
+          </div>
+
+          <div class="flex items-center justify-between mt-3">
+            <button onclick="changeScore('blue', 10)" class="touch-btn px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs shadow-md">
+              👍 書寫優秀 +10 分
+            </button>
+            <span class="text-xs text-slate-400 font-bold">國小四線格規範</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- PAGE 3: Dual Team Big Touch Block Match PK (with dedicated Wheel) -->
+    <div id="matchPage" class="page-view flex-col lg:flex-row gap-4 flex-grow">
+      
+      <!-- Left Panel: Match Question Spinner Wheel -->
+      <div class="lg:w-1/3 glass-panel rounded-3xl p-4 flex flex-col items-center justify-between border-2 border-sky-500/40 min-h-[380px]">
+        <div class="w-full flex items-center justify-between mb-2">
+          <span class="text-xs font-black text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-compass text-sky-400"></i>
+            1. 轉盤抽取搶答題目
+          </span>
+          <span id="matchRuleTag" class="text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            對齊規則中
+          </span>
+        </div>
+
+        <!-- Wheel Canvas for Match Question Mode -->
+        <div class="relative w-full max-w-[260px] aspect-square flex items-center justify-center my-auto">
+          <canvas id="wheelCanvasMatch" class="w-full h-full cursor-pointer touch-none drop-shadow-xl"></canvas>
+        </div>
+
+        <!-- Question Prompt Display -->
+        <div class="w-full bg-slate-900/90 p-3 rounded-2xl border border-sky-500/40 flex items-center justify-between my-2">
+          <div class="flex items-center gap-3">
+            <div id="matchPromptIcon" class="text-3xl bg-slate-800 p-2 rounded-xl">🍎</div>
+            <div>
+              <div class="text-xs text-slate-400 font-bold">題目目標：</div>
+              <div id="matchPromptText" class="text-2xl font-black text-white">apple</div>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="spinMatchWheel()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-black text-sm shadow-lg touch-btn flex items-center justify-center gap-2">
+          <i class="fa-solid fa-rotate text-lg"></i>
+          旋轉輪盤抽取題目！
+        </button>
+      </div>
+
+      <!-- Right Panel: Dual Team Touch Selection Grids -->
+      <div class="lg:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow">
+        <!-- Red Team Selection Block -->
+        <div class="glass-panel rounded-3xl p-4 border-2 border-red-500/50 flex flex-col justify-between">
+          <div class="text-sm font-black text-red-400 mb-2 flex items-center gap-2">
+            <i class="fa-solid fa-flag"></i> 紅隊點擊搶答區
+          </div>
+
+          <div id="redMatchGrid" class="grid grid-cols-2 gap-3 my-auto">
+            <!-- Dynamically Injected Cards -->
+          </div>
+
+          <div class="text-center text-xs text-slate-400 mt-2 font-bold">率先點擊正確卡片得 +10 分</div>
+        </div>
+
+        <!-- Blue Team Selection Block -->
+        <div class="glass-panel rounded-3xl p-4 border-2 border-blue-500/50 flex flex-col justify-between">
+          <div class="text-sm font-black text-blue-400 mb-2 flex items-center gap-2">
+            <i class="fa-solid fa-flag"></i> 藍隊點擊搶答區
+          </div>
+
+          <div id="blueMatchGrid" class="grid grid-cols-2 gap-3 my-auto">
+            <!-- Dynamically Injected Cards -->
+          </div>
+
+          <div class="text-center text-xs text-slate-400 mt-2 font-bold">率先點擊正確卡片得 +10 分</div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Vocabulary Modal -->
+  <div id="galleryModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 rounded-3xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-700">
+      <div class="bg-slate-800 text-amber-400 p-4 rounded-t-3xl flex items-center justify-between border-b border-slate-700">
+        <h2 class="text-lg font-black flex items-center gap-2">
+          <i class="fa-solid fa-book-open"></i>
+          A-Z 26 個字母代表字圖鑑
+        </h2>
+        <button onclick="closeGalleryModal()" class="w-9 h-9 rounded-full bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center font-bold">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-4 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3" id="galleryGrid">
+        <!-- Injected via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Alert Victory Dialog Modal -->
+  <div id="customModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 rounded-3xl max-w-md w-full p-6 text-center border-2 border-amber-500 shadow-2xl flex flex-col items-center gap-4">
+      <div id="modalIcon" class="text-6xl animate-bounce">🎉</div>
+      <h3 id="modalTitle" class="text-2xl font-black text-amber-400">搶答成功！</h3>
+      <p id="modalMsg" class="text-slate-200 font-bold text-base">紅隊答對了，獲得 10 分！</p>
+      <button id="modalBtn" onclick="closeCustomModal()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-base shadow-lg touch-btn">
+        確定
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Complete 26 Vocabulary items matching physical board (WS 字母與代表字轉盤)
+    const VOCAB_DATA = [
+      { letter: 'A', lower: 'a', word: 'apple', zh: '蘋果', icon: '🍎', color: '#f87171' },
+      { letter: 'B', lower: 'b', word: 'book', zh: '書本', icon: '📖', color: '#fb923c' },
+      { letter: 'C', lower: 'c', word: 'cup', zh: '杯子', icon: '☕', color: '#fbbf24' },
+      { letter: 'D', lower: 'd', word: 'dog', zh: '小狗', icon: '🐶', color: '#a3e635' },
+      { letter: 'E', lower: 'e', word: 'egg', zh: '雞蛋', icon: '🥚', color: '#34d399' },
+      { letter: 'F', lower: 'f', word: 'fish', zh: '小魚', icon: '🐟', color: '#2dd4bf' },
+      { letter: 'G', lower: 'g', word: 'goat', zh: '山羊', icon: '🐐', color: '#38bdf8' },
+      { letter: 'H', lower: 'h', word: 'hat', zh: '帽子', icon: '👒', color: '#60a5fa' },
+      { letter: 'I', lower: 'i', word: 'igloo', zh: '冰屋', icon: '🛖', color: '#818cf8' },
+      { letter: 'J', lower: 'j', word: 'jam', zh: '果醬', icon: '🥫', color: '#a78bfa' },
+      { letter: 'K', lower: 'k', word: 'kite', zh: '風箏', icon: '🪁', color: '#c084fc' },
+      { letter: 'L', lower: 'l', word: 'lion', zh: '獅子', icon: '🦁', color: '#e879f9' },
+      { letter: 'M', lower: 'm', word: 'monkey', zh: '猴子', icon: '🐒', color: '#f472b6' },
+      { letter: 'N', lower: 'n', word: 'net', zh: '網子', icon: '🕸️', color: '#fb7185' },
+      { letter: 'O', lower: 'o', word: 'ox', zh: '公牛', icon: '🐂', color: '#f87171' },
+      { letter: 'P', lower: 'p', word: 'pig', zh: '小豬', icon: '🐖', color: '#fb923c' },
+      { letter: 'Q', lower: 'q', word: 'quilt', zh: '棉被', icon: '🛋️', color: '#fbbf24' },
+      { letter: 'R', lower: 'r', word: 'rabbit', zh: '兔子', icon: '🐰', color: '#a3e635' },
+      { letter: 'S', lower: 's', word: 'sun', zh: '太陽', icon: '☀️', color: '#34d399' },
+      { letter: 'T', lower: 't', word: 'toy', zh: '玩具', icon: '🧸', color: '#2dd4bf' },
+      { letter: 'U', lower: 'u', word: 'umbrella', zh: '雨傘', icon: '☂️', color: '#38bdf8' },
+      { letter: 'V', lower: 'v', word: 'van', zh: '廂型車', icon: '🚐', color: '#60a5fa' },
+      { letter: 'W', lower: 'w', word: 'watch', zh: '手錶', icon: '⌚', color: '#818cf8' },
+      { letter: 'X', lower: 'x', word: 'fox', zh: '狐狸', icon: '🦊', color: '#a78bfa' },
+      { letter: 'Y', lower: 'y', word: 'yo-yo', zh: '溜溜球', icon: '🪀', color: '#c084fc' },
+      { letter: 'Z', lower: 'z', word: 'zebra', zh: '斑馬', icon: '🦓', color: '#e879f9' }
+    ];
+
+    // Classroom Activity List (指定 5 項課堂動態互動任務)
+    const CLASSROOM_ACTIVITIES = [
+      "🤝 找身邊的同學，互相念出這個字母與發音！",
+      "✍️ 請在空中用手指畫出這個字母的大寫與小寫！",
+      "📣 全班一起大聲朗讀這個單字3次！",
+      "🎭 請做出這個單字或動物的動作",
+      "🏃 快找出這個字母開頭的東西！"
+    ];
+
+    // Audio Synthesizer Effects
+    class SoundManager {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+      playClick() {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(120, this.ctx.currentTime + 0.05);
+        gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.05);
+      }
+      playSuccess() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+          gain.gain.setValueAtTime(0.2, now + idx * 0.08);
+          gain.gain.linearRampToValueAtTime(0.01, now + idx * 0.08 + 0.2);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.08);
+          osc.stop(now + idx * 0.08 + 0.2);
+        });
+      }
+    }
+    const soundMgr = new SoundManager();
+
+    function toggleSound() {
+      soundMgr.enabled = !soundMgr.enabled;
+      const icon = document.getElementById('soundIcon');
+      if (soundMgr.enabled) {
+        icon.className = "fa-solid fa-volume-high text-lg";
+      } else {
+        icon.className = "fa-solid fa-volume-xmark text-lg text-slate-500";
+      }
+    }
+
+    let currentTab = 'wheelPage';
+    let scoreRed = 0, scoreBlue = 0;
+
+    function changeScore(team, val) {
+      if (team === 'red') {
+        scoreRed = Math.max(0, scoreRed + val);
+        document.getElementById('scoreRed').innerText = scoreRed;
+      } else {
+        scoreBlue = Math.max(0, scoreBlue + val);
+        document.getElementById('scoreBlue').innerText = scoreBlue;
+      }
+      soundMgr.playClick();
+    }
+
+    function switchPage(pageId) {
+      currentTab = pageId;
+      document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+
+      document.querySelectorAll('.nav-tab-btn').forEach(btn => {
+        btn.className = "nav-tab-btn py-3 px-2 rounded-xl transition text-slate-300 hover:bg-slate-800 flex items-center justify-center gap-2";
+      });
+
+      if (pageId === 'wheelPage') {
+        document.getElementById('tabBtnWheel').className = "nav-tab-btn py-3 px-2 rounded-xl transition bg-amber-500 text-slate-950 font-black shadow-xl flex items-center justify-center gap-2";
+        setTimeout(initMainWheel, 50);
+      } else if (pageId === 'tracingPage') {
+        document.getElementById('tabBtnTracing').className = "nav-tab-btn py-3 px-2 rounded-xl transition bg-emerald-500 text-slate-950 font-black shadow-xl flex items-center justify-center gap-2";
+        setTimeout(() => {
+          initTracingWheel();
+          setupTracingCanvases();
+        }, 50);
+      } else if (pageId === 'matchPage') {
+        document.getElementById('tabBtnMatch').className = "nav-tab-btn py-3 px-2 rounded-xl transition bg-sky-500 text-slate-950 font-black shadow-xl flex items-center justify-center gap-2";
+        setTimeout(initMatchWheel, 50);
+      }
+    }
+
+    function speakText(text) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-US';
+      u.rate = 0.85;
+      window.speechSynthesis.speak(u);
+    }
+
+    const SLICE_ANGLE = (Math.PI * 2) / 26;
+    const INIT_WHEEL_ANGLE = -Math.PI / 2 - 0.5 * SLICE_ANGLE;
+
+    // Angles for 3 Wheels initialized to align slice 0 (A/apple) with top indicator (-PI/2)
+    let mainAngles = { outer: INIT_WHEEL_ANGLE, mid: INIT_WHEEL_ANGLE, inner: INIT_WHEEL_ANGLE };
+    let tracingAngle = INIT_WHEEL_ANGLE;
+    let matchAngle = INIT_WHEEL_ANGLE;
+
+    let tracingTargetIdx = 0;
+    let matchTargetIdx = 0;
+    let matchCorrectAnswer = '';
+
+    function getIndexFromAngle(angle) {
+      const slice = (Math.PI * 2) / 26;
+      let diff = -Math.PI / 2 - angle;
+      let normalized = ((diff % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      let idx = Math.floor(normalized / slice) % 26;
+      return idx;
+    }
+
+    // PAGE 1: MAIN 3-RING WHEEL CANVAS
+    function initMainWheel() {
+      drawMainWheel();
+    }
+
+    function drawMainWheel() {
+      const canvas = document.getElementById('wheelCanvasMain');
+      if (!canvas) return;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) return;
+      
+      canvas.width = rect.width * 2;
+      canvas.height = rect.height * 2;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      const cx = w / 2, cy = h / 2;
+      const maxR = Math.max(10, Math.min(w, h) / 2 - 10);
+
+      const rOuter = maxR;
+      const rMid = maxR * 0.66;
+      const rInner = maxR * 0.44;
+      const rCenter = maxR * 0.22;
+
+      drawSingleRing(ctx, cx, cy, rMid, rOuter, mainAngles.outer, (i) => {
+        const item = VOCAB_DATA[i];
+        ctx.fillStyle = i % 2 === 0 ? '#1e293b' : '#0f172a';
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        return {
+          isStacked: true,
+          icon: item.icon,
+          word: item.word,
+          iconFont: `bold ${maxR * 0.08}px "Fredoka", sans-serif`,
+          wordFont: `bold ${maxR * 0.05}px "Fredoka", sans-serif`,
+          offsetY: maxR * 0.055,
+          color: '#f8fafc'
+        };
+      });
+
+      drawSingleRing(ctx, cx, cy, rInner, rMid, mainAngles.mid, (i) => {
+        const item = VOCAB_DATA[i];
+        ctx.fillStyle = i % 2 === 0 ? '#334155' : '#1e293b';
+        return { text: item.letter, font: `bold ${maxR * 0.08}px "Fredoka", sans-serif`, color: '#c084fc' };
+      });
+
+      drawSingleRing(ctx, cx, cy, rCenter, rInner, mainAngles.inner, (i) => {
+        const item = VOCAB_DATA[i];
+        ctx.fillStyle = i % 2 === 0 ? '#475569' : '#334155';
+        return { text: item.lower, font: `bold ${maxR * 0.08}px "Fredoka", sans-serif`, color: '#fbbf24' };
+      });
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, rCenter, 0, Math.PI * 2);
+      ctx.fillStyle = '#0f172a';
+      ctx.fill();
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = '#f59e0b';
+      ctx.stroke();
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = `bold ${maxR * 0.07}px "Fredoka", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('WS', cx, cy);
+
+      drawTopPointer(ctx, cx, cy, maxR);
+      updateMainResultsUI();
+    }
+
+    function drawSingleRing(ctx, cx, cy, innerR, outerR, startAngle, getContent) {
+      const slice = (Math.PI * 2) / 26;
+      for (let i = 0; i < 26; i++) {
+        const a1 = startAngle + i * slice;
+        const a2 = a1 + slice;
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR, a1, a2);
+        ctx.arc(cx, cy, innerR, a2, a1, true);
+        ctx.closePath();
+
+        const content = getContent(i, slice);
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.save();
+        const midA = a1 + slice / 2;
+        const midR = (innerR + outerR) / 2;
+        ctx.translate(cx + Math.cos(midA) * midR, cy + Math.sin(midA) * midR);
+        ctx.rotate(midA + Math.PI / 2);
+
+        if (content.isStacked) {
+          ctx.font = content.iconFont;
+          ctx.fillStyle = content.color;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(content.icon, 0, -content.offsetY);
+
+          ctx.font = content.wordFont;
+          ctx.fillStyle = content.wordColor || content.color;
+          ctx.fillText(content.word, 0, content.offsetY);
+        } else {
+          ctx.fillStyle = content.color;
+          ctx.font = content.font;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(content.text, 0, 0);
+        }
+        ctx.restore();
+      }
+    }
+
+    function drawTopPointer(ctx, cx, cy, maxR) {
+      ctx.save();
+      ctx.fillStyle = '#ef4444';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(cx - 16, cy - maxR - 12);
+      ctx.lineTo(cx + 16, cy - maxR - 12);
+      ctx.lineTo(cx, cy - maxR + 18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function spinMainRing(target) {
+      soundMgr.playClick();
+      const extraRounds = 4 + Math.random() * 3;
+      const randIndex = Math.floor(Math.random() * 26);
+      const slice = (Math.PI * 2) / 26;
+      const targetAngle = -Math.PI / 2 - (randIndex + 0.5) * slice - extraRounds * Math.PI * 2;
+
+      let startA = mainAngles[target];
+      let startTime = null;
+      const duration = 2200;
+
+      function animate(time) {
+        if (!startTime) startTime = time;
+        let progress = (time - startTime) / duration;
+        if (progress > 1) progress = 1;
+
+        let ease = 1 - Math.pow(1 - progress, 3);
+        mainAngles[target] = startA + (targetAngle - startA) * ease;
+        drawMainWheel();
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          soundMgr.playSuccess();
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+
+    function spinAllMainRings() {
+      spinMainRing('outer');
+      setTimeout(() => spinMainRing('mid'), 150);
+      setTimeout(() => spinMainRing('inner'), 300);
+    }
+
+    function updateMainResultsUI() {
+      const idxO = getIndexFromAngle(mainAngles.outer);
+      const idxM = getIndexFromAngle(mainAngles.mid);
+      const idxI = getIndexFromAngle(mainAngles.inner);
+
+      const itemO = VOCAB_DATA[idxO];
+      const itemM = VOCAB_DATA[idxM];
+      const itemI = VOCAB_DATA[idxI];
+
+      document.getElementById('resOuterIcon').innerText = itemO.icon;
+      
+      const wO = itemO.word;
+      document.getElementById('resOuterWord').innerHTML = `<span class="text-amber-400 font-black text-xl bg-amber-400/20 px-1.5 py-0.5 rounded border border-amber-400/50 mr-0.5">${wO.charAt(0)}</span><span class="text-white">${wO.slice(1)}</span>`;
+      
+      document.getElementById('resMidLetter').innerHTML = `<span class="text-purple-300 font-black text-4xl underline decoration-purple-400 decoration-4">${itemM.letter}</span>`;
+      document.getElementById('resInnerLetter').innerHTML = `<span class="text-amber-300 font-black text-4xl underline decoration-amber-400 decoration-4">${itemI.lower}</span>`;
+
+      const badge = document.getElementById('matchBadge');
+      if (idxO === idxM && idxM === idxI) {
+        badge.className = "text-xs font-black px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-bounce";
+        badge.innerText = "✨ 三圈完美對齊！";
+      } else {
+        badge.className = "text-xs font-bold px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700";
+        badge.innerText = "旋轉組合中";
+      }
+    }
+
+    function speakResult(ring) {
+      if (ring === 'outer') {
+        const item = VOCAB_DATA[getIndexFromAngle(mainAngles.outer)];
+        speakText(item.word);
+      } else if (ring === 'mid') {
+        const item = VOCAB_DATA[getIndexFromAngle(mainAngles.mid)];
+        speakText(`Capital ${item.letter}`);
+      } else if (ring === 'inner') {
+        const item = VOCAB_DATA[getIndexFromAngle(mainAngles.inner)];
+        speakText(`Small ${item.lower}`);
+      }
+    }
+
+    function speakCurrentWordCombo() {
+      const item = VOCAB_DATA[getIndexFromAngle(mainAngles.outer)];
+      speakText(`${item.letter}. ${item.word}`);
+    }
+
+    function triggerClassroomActivity() {
+      soundMgr.playClick();
+      const randAct = CLASSROOM_ACTIVITIES[Math.floor(Math.random() * CLASSROOM_ACTIVITIES.length)];
+      const card = document.getElementById('activityCard');
+      card.innerHTML = `
+        <div class="text-xs text-purple-400 font-bold mb-1">抽中課堂任務！</div>
+        <div class="text-base font-black text-amber-300 animate-pulse">${randAct}</div>
+      `;
+      speakText("Classroom activity time!");
+    }
+
+    // PAGE 2: TRACING WHEEL & CANVASES
+    function initTracingWheel() {
+      const canvas = document.getElementById('wheelCanvasTracing');
+      if (canvas && !canvas.onclick) {
+        canvas.onclick = () => spinTracingWheel();
+      }
+      drawTracingWheel();
+      updateTracingTargetDisplay();
+    }
+
+    function drawTracingWheel() {
+      const canvas = document.getElementById('wheelCanvasTracing');
+      if (!canvas) return;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) return;
+
+      canvas.width = rect.width * 2;
+      canvas.height = rect.height * 2;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      const cx = w / 2, cy = h / 2;
+      const maxR = Math.max(10, Math.min(w, h) / 2 - 10);
+
+      ctx.clearRect(0, 0, w, h);
+
+      drawSingleRing(ctx, cx, cy, maxR * 0.35, maxR, tracingAngle, (i) => {
+        const item = VOCAB_DATA[i];
+        ctx.fillStyle = i % 2 === 0 ? '#065f46' : '#047857';
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        return { text: `${item.letter}${item.lower}`, font: `bold ${maxR * 0.12}px "Fredoka", sans-serif`, color: '#ffffff' };
+      });
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, maxR * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = '#0f172a'; ctx.fill();
+      ctx.lineWidth = 4; ctx.strokeStyle = '#10b981'; ctx.stroke();
+
+      ctx.fillStyle = '#10b981';
+      ctx.font = `bold ${maxR * 0.12}px "Fredoka", sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('✍️', cx, cy);
+
+      drawTopPointer(ctx, cx, cy, maxR);
+    }
+
+    function spinTracingWheel() {
+      soundMgr.playClick();
+      const extraRounds = 4 + Math.random() * 3;
+      const randIndex = Math.floor(Math.random() * 26);
+      const slice = (Math.PI * 2) / 26;
+      const targetA = -Math.PI / 2 - (randIndex + 0.5) * slice - extraRounds * Math.PI * 2;
+
+      let startA = tracingAngle;
+      let startTime = null;
+
+      function animate(time) {
+        if (!startTime) startTime = time;
+        let progress = (time - startTime) / 2000;
+        if (progress > 1) progress = 1;
+        let ease = 1 - Math.pow(1 - progress, 3);
+        tracingAngle = startA + (targetA - startA) * ease;
+        drawTracingWheel();
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          soundMgr.playSuccess();
+          updateTracingTargetDisplay();
+          speakCurrentTracingTarget();
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+
+    function updateTracingTargetDisplay() {
+      tracingTargetIdx = getIndexFromAngle(tracingAngle);
+      const target = VOCAB_DATA[tracingTargetIdx];
+      document.getElementById('tracingTargetIcon').innerText = target.icon;
+      
+      document.getElementById('tracingTargetText').innerText = `${target.letter}${target.lower} (${target.word})`;
+      drawBackgroundGrid('canvasRed', target);
+      drawBackgroundGrid('canvasBlue', target);
+    }
+
+    function speakCurrentTracingTarget() {
+      const target = VOCAB_DATA[tracingTargetIdx];
+      speakText(`${target.letter}. ${target.lower}. ${target.word}`);
+    }
+
+    function setupTracingCanvases() {
+      updateTracingTargetDisplay();
+      initSingleTracingCanvas('canvasRed', 'red');
+      initSingleTracingCanvas('canvasBlue', 'blue');
+    }
+
+    // Helper for pixel-perfect letter placement within bounds
+    function drawPreciseLetter(ctx, char, centerX, targetTopY, targetBottomY) {
+      const targetH = targetBottomY - targetTopY;
+      if (targetH <= 0) return;
+
+      let testFontSize = targetH * 1.2;
+      ctx.font = `bold ${testFontSize}px "Fredoka", sans-serif`;
+
+      let m = ctx.measureText(char);
+      let actualH = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
+
+      if (actualH > 0) {
+        let fittedFontSize = testFontSize * (targetH / actualH);
+        ctx.font = `bold ${fittedFontSize}px "Fredoka", sans-serif`;
+        m = ctx.measureText(char);
+      }
+
+      const baselineY = targetBottomY - m.actualBoundingBoxDescent;
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(char, centerX, baselineY);
+    }
+
+    function drawBackgroundGrid(canvasId, target) {
+      const c = document.getElementById(canvasId);
+      if (!c) return;
+      const rect = c.parentElement.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) return;
+
+      c.width = rect.width;
+      c.height = rect.height;
+      const ctx = c.getContext('2d');
+
+      ctx.clearRect(0, 0, c.width, c.height);
+
+      const h = c.height, w = c.width;
+
+      // 精確 4 線 3 格高度計算
+      const space = h * 0.20;
+      const topL = h * 0.28;       // Line 1: 第一線 (頂線)
+      const midL = topL + space;   // Line 2: 第二線 (中線)
+      const baseL = midL + space;  // Line 3: 第三線 (基線)
+      const botL = baseL + space;  // Line 4: 第四線 (底線)
+
+      // 左右側與中央分割 x 座標 (將大小寫包含於同一連貫房屋中)
+      const xLeft = w * 0.10;
+      const xMid = w * 0.50;
+      const xRight = w * 0.90;
+
+      const xUpperCenter = (xLeft + xMid) / 2;
+      const xLowerCenter = (xMid + xRight) / 2;
+
+      // 1. 繪製標準 4 線格
+      ctx.save();
+
+      // 第一線：灰色粗體
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#94a3b8';
+      ctx.beginPath(); ctx.moveTo(0, topL); ctx.lineTo(w, topL); ctx.stroke();
+
+      // 第二線：灰色虛線
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.moveTo(0, midL); ctx.lineTo(w, midL); ctx.stroke();
+
+      // 第三線 (基線)：藍色粗體
+      ctx.setLineDash([]);
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = '#3b82f6';
+      ctx.beginPath(); ctx.moveTo(0, baseL); ctx.lineTo(w, baseL); ctx.stroke();
+
+      // 第四線：灰色粗體
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#94a3b8';
+      ctx.beginPath(); ctx.moveTo(0, botL); ctx.lineTo(w, botL); ctx.stroke();
+
+      ctx.restore();
+
+      // 2. 繪製何嘉仁房屋卡連貫粉色房屋結構 (Pink House)
+      ctx.save();
+      ctx.strokeStyle = '#f472b6';
+      ctx.lineWidth = 2.5;
+      ctx.fillStyle = 'rgba(244, 114, 182, 0.06)';
+
+      const lowChar = target.lower;
+      const ascenders = ['b', 'd', 'f', 'h', 'k', 'l', 't'];
+      const descenders = ['g', 'p', 'q', 'y'];
+      const roofHeight = space * 0.70;
+      const ijTop = topL + space * 0.25; // 字母 i, j 圓點最上方的精確高度
+
+      ctx.beginPath();
+
+      if (ascenders.includes(lowChar)) {
+        // 類別 1: 大小寫均達第一線 -> 寬大三角屋頂涵蓋全房屋 (如 Bb, Hh, Kk)
+        const peakX = (xLeft + xRight) / 2;
+        const peakY = topL - roofHeight;
+        ctx.moveTo(xLeft, topL);
+        ctx.lineTo(peakX, peakY);
+        ctx.lineTo(xRight, topL);
+        ctx.lineTo(xRight, baseL);
+        ctx.lineTo(xLeft, baseL);
+        ctx.closePath();
+      } else if (descenders.includes(lowChar)) {
+        // 類別 2: 下沉字 (g, p, q, y) -> 左側大寫屋頂，右側頂部降至中線，底部延伸至第四線
+        const peakX = (xLeft + xMid) / 2;
+        const peakY = topL - roofHeight;
+        ctx.moveTo(xLeft, topL);
+        ctx.lineTo(peakX, peakY);
+        ctx.lineTo(xMid, topL);
+        ctx.lineTo(xMid, midL);
+        ctx.lineTo(xRight, midL);
+        ctx.lineTo(xRight, botL);
+        ctx.lineTo(xMid, botL);
+        ctx.lineTo(xMid, baseL);
+        ctx.lineTo(xLeft, baseL);
+        ctx.closePath();
+      } else if (lowChar === 'i') {
+        // 類別 3: 小寫 i -> 頂部貼齊字母 i 的圓點最上緣 (ijTop)，底部至基線 baseL
+        const peakX = (xLeft + xMid) / 2;
+        const peakY = topL - roofHeight;
+        ctx.moveTo(xLeft, topL);
+        ctx.lineTo(peakX, peakY);
+        ctx.lineTo(xMid, topL);
+        ctx.lineTo(xMid, ijTop);
+        ctx.lineTo(xRight, ijTop);
+        ctx.lineTo(xRight, baseL);
+        ctx.lineTo(xLeft, baseL);
+        ctx.closePath();
+      } else if (lowChar === 'j') {
+        // 類別 4: 小寫 j -> 頂部貼齊字母 j 的圓點最上緣 (ijTop)，底部延伸至第四線 botL
+        const peakX = (xLeft + xMid) / 2;
+        const peakY = topL - roofHeight;
+        ctx.moveTo(xLeft, topL);
+        ctx.lineTo(peakX, peakY);
+        ctx.lineTo(xMid, topL);
+        ctx.lineTo(xMid, ijTop);
+        ctx.lineTo(xRight, ijTop);
+        ctx.lineTo(xRight, botL);
+        ctx.lineTo(xMid, botL);
+        ctx.lineTo(xMid, baseL);
+        ctx.lineTo(xLeft, baseL);
+        ctx.closePath();
+      } else {
+        // 類別 5: 中格字 (a, c, e, m, n, o, r, s, u, v, w, x, z) -> 左側大寫屋頂，右側階梯降至中線 (如 Aa, Cc)
+        const peakX = (xLeft + xMid) / 2;
+        const peakY = topL - roofHeight;
+        ctx.moveTo(xLeft, topL);
+        ctx.lineTo(peakX, peakY);
+        ctx.lineTo(xMid, topL);
+        ctx.lineTo(xMid, midL);
+        ctx.lineTo(xRight, midL);
+        ctx.lineTo(xRight, baseL);
+        ctx.lineTo(xLeft, baseL);
+        ctx.closePath();
+      }
+
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      // 3. 繪製字母描紅提示 (字體與顏色維持不變)
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+
+      // 大寫字母 A-Z：一律置於左側 (xUpperCenter)，貼齊 Line 1 (topL) 至 Line 3 (baseL)
+      drawPreciseLetter(ctx, target.letter, xUpperCenter, topL, baseL);
+
+      // 小寫字母：置於右側 (xLowerCenter)，依分類設定精確邊界
+      const midLetters = ['a', 'c', 'e', 'm', 'n', 'o', 'r', 's', 'u', 'v', 'w', 'x', 'z'];
+      if (midLetters.includes(lowChar)) {
+        drawPreciseLetter(ctx, lowChar, xLowerCenter, midL, baseL);
+      } else if (ascenders.includes(lowChar)) {
+        if (lowChar === 'f' || lowChar === 't') {
+          drawPreciseLetter(ctx, lowChar, xLowerCenter, topL + space * 0.12, baseL);
+        } else if (lowChar === 'i') {
+          drawPreciseLetter(ctx, lowChar, xLowerCenter, topL + space * 0.25, baseL);
+        } else {
+          drawPreciseLetter(ctx, lowChar, xLowerCenter, topL, baseL);
+        }
+      } else if (descenders.includes(lowChar)) {
+        drawPreciseLetter(ctx, lowChar, xLowerCenter, midL, botL);
+      } else if (lowChar === 'j') {
+        drawPreciseLetter(ctx, lowChar, xLowerCenter, topL + space * 0.25, botL);
+      }
+
+      ctx.restore();
+    }
+
+    function initSingleTracingCanvas(canvasId, team) {
+      const c = document.getElementById(canvasId);
+      if (!c) return;
+
+      // 防止切換頁面時重複綁定事件
+      if (c.dataset.initialized === "true") return;
+      c.dataset.initialized = "true";
+
+      const ctx = c.getContext('2d');
+      let isDrawing = false;
+
+      function getPos(e) {
+        const r = c.getBoundingClientRect();
+        let clientX = e.clientX;
+        let clientY = e.clientY;
+
+        if (e.touches && e.touches.length > 0) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+          clientX = e.changedTouches[0].clientX;
+          clientY = e.changedTouches[0].clientY;
+        }
+        return { x: clientX - r.left, y: clientY - r.top };
+      }
+
+      function startDraw(e) {
+        e.preventDefault();
+        isDrawing = true;
+        const p = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.strokeStyle = team === 'red' ? '#f87171' : '#60a5fa';
+        ctx.lineWidth = 7;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+      }
+
+      function moveDraw(e) {
+        if (!isDrawing) return;
+        e.preventDefault();
+        const p = getPos(e);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+      }
+
+      function stopDraw(e) {
+        if (isDrawing) {
+          isDrawing = false;
+          ctx.beginPath();
+        }
+      }
+
+      // 現代大螢幕指標事件 (Pointer Events: 支援觸控筆、手指與滑鼠)
+      c.addEventListener('pointerdown', startDraw, { passive: false });
+      c.addEventListener('pointermove', moveDraw, { passive: false });
+      c.addEventListener('pointerup', stopDraw, { passive: false });
+      c.addEventListener('pointercancel', stopDraw, { passive: false });
+
+      // 標準 Touch 事件備援
+      c.addEventListener('touchstart', startDraw, { passive: false });
+      c.addEventListener('touchmove', moveDraw, { passive: false });
+      c.addEventListener('touchend', stopDraw, { passive: false });
+      c.addEventListener('touchcancel', stopDraw, { passive: false });
+
+      // 滑鼠事件備援
+      c.addEventListener('mousedown', startDraw);
+      c.addEventListener('mousemove', moveDraw);
+
+      // 全域放開監聽（確保手指或滑鼠移出畫布外放開時，也能正確結束繪圖狀態）
+      window.addEventListener('mouseup', stopDraw);
+      window.addEventListener('touchend', stopDraw);
+      window.addEventListener('pointerup', stopDraw);
+    }
+
+    function clearTracingPad(team) {
+      soundMgr.playClick();
+      const target = VOCAB_DATA[tracingTargetIdx];
+      drawBackgroundGrid(team === 'red' ? 'canvasRed' : 'canvasBlue', target);
+    }
+
+    // PAGE 3: MATCH QUESTION WHEEL & TOUCH SELECTION GRIDS
+    function initMatchWheel() {
+      const canvas = document.getElementById('wheelCanvasMatch');
+      if (canvas && !canvas.onclick) {
+        canvas.onclick = () => spinMatchWheel();
+      }
+      drawMatchWheel();
+      generateMatchQuestion();
+    }
+
+    function drawMatchWheel() {
+      const canvas = document.getElementById('wheelCanvasMatch');
+      if (!canvas) return;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) return;
+
+      canvas.width = rect.width * 2;
+      canvas.height = rect.height * 2;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      const cx = w / 2, cy = h / 2;
+      const maxR = Math.max(10, Math.min(w, h) / 2 - 10);
+
+      ctx.clearRect(0, 0, w, h);
+
+      drawSingleRing(ctx, cx, cy, maxR * 0.35, maxR, matchAngle, (i) => {
+        const item = VOCAB_DATA[i];
+        ctx.fillStyle = i % 2 === 0 ? '#0369a1' : '#0284c7';
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        return {
+          isStacked: true,
+          icon: item.icon,
+          word: item.word,
+          iconFont: `bold ${maxR * 0.12}px "Fredoka", sans-serif`,
+          wordFont: `bold ${maxR * 0.07}px "Fredoka", sans-serif`,
+          offsetY: maxR * 0.08,
+          color: '#ffffff'
+        };
+      });
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, maxR * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = '#0f172a'; ctx.fill();
+      ctx.lineWidth = 4; ctx.strokeStyle = '#38bdf8'; ctx.stroke();
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = `bold ${maxR * 0.12}px "Fredoka", sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🧩', cx, cy);
+
+      drawTopPointer(ctx, cx, cy, maxR);
+    }
+
+    function spinMatchWheel() {
+      soundMgr.playClick();
+      const extraRounds = 4 + Math.random() * 3;
+      const randIndex = Math.floor(Math.random() * 26);
+      const slice = (Math.PI * 2) / 26;
+      const targetA = -Math.PI / 2 - (randIndex + 0.5) * slice - extraRounds * Math.PI * 2;
+
+      let startA = matchAngle;
+      let startTime = null;
+
+      function animate(time) {
+        if (!startTime) startTime = time;
+        let progress = (time - startTime) / 2000;
+        if (progress > 1) progress = 1;
+        let ease = 1 - Math.pow(1 - progress, 3);
+        matchAngle = startA + (targetA - startA) * ease;
+        drawMatchWheel();
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          soundMgr.playSuccess();
+          generateMatchQuestion();
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+
+    function generateMatchQuestion() {
+      matchTargetIdx = getIndexFromAngle(matchAngle);
+      const target = VOCAB_DATA[matchTargetIdx];
+      
+      const ruleTypes = ['lower_word', 'upper_word', 'upper_letter', 'lower_letter'];
+      const rule = ruleTypes[Math.floor(Math.random() * ruleTypes.length)];
+
+      let promptText = '';
+      let ruleTag = '';
+
+      if (rule === 'lower_word') {
+        promptText = target.word;
+        ruleTag = "📌 題目：全小寫單字 ➔ 搶答「首字母大寫」";
+        matchCorrectAnswer = target.letter;
+      } else if (rule === 'upper_word') {
+        promptText = target.word.charAt(0).toUpperCase() + target.word.slice(1);
+        ruleTag = "📌 題目：首字母大寫單字 ➔ 搶答「小寫字母」";
+        matchCorrectAnswer = target.lower;
+      } else if (rule === 'upper_letter') {
+        promptText = target.letter;
+        ruleTag = "📌 題目：大寫字母 ➔ 搶答「小寫字母」";
+        matchCorrectAnswer = target.lower;
+      } else if (rule === 'lower_letter') {
+        promptText = target.lower;
+        ruleTag = "📌 題目：小寫字母 ➔ 搶答「大寫字母」";
+        matchCorrectAnswer = target.letter;
+      }
+
+      document.getElementById('matchRuleTag').innerText = ruleTag;
+      document.getElementById('matchPromptIcon').innerText = target.icon;
+
+      if (rule === 'lower_word' || rule === 'upper_word') {
+        const first = promptText.charAt(0);
+        const rest = promptText.slice(1);
+        document.getElementById('matchPromptText').innerHTML = `<span class="text-amber-400 font-black text-3xl bg-amber-400/20 px-2 py-0.5 rounded-lg border border-amber-400/50">${first}</span><span class="text-white text-2xl font-bold">${rest}</span>`;
+      } else {
+        document.getElementById('matchPromptText').innerHTML = `<span class="text-amber-400 font-black text-3xl bg-amber-400/20 px-3 py-0.5 rounded-lg border border-amber-400/50">${promptText}</span>`;
+      }
+
+      let choices = [matchCorrectAnswer];
+      const isExpectingUpper = matchCorrectAnswer === matchCorrectAnswer.toUpperCase();
+
+      while (choices.length < 4) {
+        let rand = VOCAB_DATA[Math.floor(Math.random() * VOCAB_DATA.length)];
+        let choiceVal = isExpectingUpper ? rand.letter : rand.lower;
+        if (!choices.includes(choiceVal)) {
+          choices.push(choiceVal);
+        }
+      }
+
+      renderTeamMatchGrid('redMatchGrid', [...choices].sort(() => Math.random() - 0.5), 'red');
+      renderTeamMatchGrid('blueMatchGrid', [...choices].sort(() => Math.random() - 0.5), 'blue');
+
+      speakText(`Question: ${promptText}`);
+    }
+
+    function renderTeamMatchGrid(gridId, options, team) {
+      const container = document.getElementById(gridId);
+      const bgClass = team === 'red' ? 'bg-red-950/60 border-red-500/40 text-red-200 hover:bg-red-900/80' : 'bg-blue-950/60 border-blue-500/40 text-blue-200 hover:bg-blue-900/80';
+      
+      container.innerHTML = options.map(opt => `
+        <button onclick="submitTeamMatchChoice('${team}', '${opt}')" class="giant-card touch-btn ${bgClass} font-black text-4xl py-6 flex items-center justify-center">
+          ${opt}
+        </button>
+      `).join('');
+    }
+
+    function submitTeamMatchChoice(team, choice) {
+      if (choice === matchCorrectAnswer) {
+        soundMgr.playSuccess();
+        if (typeof confetti === 'function') confetti({ particleCount: 80, spread: 70 });
+        changeScore(team, 10);
+        showCustomModal('🎉 搶答成功！', `${team === 'red' ? '紅隊' : '藍隊'}答對了！獲得 10 分！`, '下一題', () => {
+          spinMatchWheel();
+        });
+      } else {
+        soundMgr.playClick();
+        showCustomModal('😅 答錯囉！', `${team === 'red' ? '紅隊' : '藍隊'}再仔細看一下題目與規則喔！`, '繼續嘗試', null);
+      }
+    }
+
+    function openGalleryModal() {
+      soundMgr.playClick();
+      const grid = document.getElementById('galleryGrid');
+      grid.innerHTML = VOCAB_DATA.map(item => `
+        <div onclick="speakText('${item.word}')" class="bg-slate-800 p-3 rounded-2xl border border-slate-700 flex flex-col items-center justify-center cursor-pointer hover:border-amber-400 transition">
+          <div class="text-3xl mb-1">${item.icon}</div>
+          <div class="text-lg font-black text-amber-400">${item.letter} ${item.lower}</div>
+          <div class="text-xs font-bold text-slate-200">${item.word} (${item.zh})</div>
+        </div>
+      `).join('');
+      document.getElementById('galleryModal').classList.remove('hidden');
+    }
+
+    function closeGalleryModal() {
+      soundMgr.playClick();
+      document.getElementById('galleryModal').classList.add('hidden');
+    }
+
+    let modalCallback = null;
+    function showCustomModal(title, msg, btnText, cb) {
+      document.getElementById('modalTitle').innerText = title;
+      document.getElementById('modalMsg').innerText = msg;
+      document.getElementById('modalBtn').innerText = btnText;
+      modalCallback = cb;
+      document.getElementById('customModal').classList.remove('hidden');
+    }
+
+    function closeCustomModal() {
+      soundMgr.playClick();
+      document.getElementById('customModal').classList.add('hidden');
+      if (modalCallback) {
+        modalCallback();
+        modalCallback = null;
+      }
+    }
+
+    window.onload = () => {
+      switchPage('wheelPage');
+    };
+
+    window.addEventListener('resize', () => {
+      if (currentTab === 'wheelPage') drawMainWheel();
+      else if (currentTab === 'tracingPage') { drawTracingWheel(); updateTracingTargetDisplay(); }
+      else if (currentTab === 'matchPage') drawMatchWheel();
+    });
+  </script>
+</body>
+</html>
